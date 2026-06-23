@@ -31,14 +31,25 @@ export function Column({ column }: Props) {
       style={{
         width: 260,
         flex: "0 0 260px",
-        padding: "24px 16px",
+        height: "100%",
+        padding: "24px 16px 16px",
         borderRight: "1px solid var(--divider)",
         display: "flex",
         flexDirection: "column",
         gap: 8,
+        // Keep the column within the board viewport so the bookmark list can
+        // scroll on its own instead of overflowing and getting clipped.
+        minHeight: 0,
       }}
     >
-      <header style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+      <header
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          gap: 8,
+          flex: "0 0 auto",
+        }}
+      >
         <h2
           style={{
             margin: 0,
@@ -55,7 +66,19 @@ export function Column({ column }: Props) {
         <span style={{ fontSize: 13, color: "var(--muted)" }}>({total})</span>
       </header>
 
-      <nav style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+      <nav
+        className="board-scroll"
+        data-col-scroll=""
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 1,
+          flex: "1 1 auto",
+          minHeight: 0,
+          overflowY: "auto",
+          paddingRight: 4,
+        }}
+      >
         {visible.length === 0 ? (
           <div style={{ fontSize: 13, color: "var(--muted)", padding: "6px 8px" }}>
             空
@@ -77,6 +100,7 @@ export function Column({ column }: Props) {
             fontSize: 13,
             color: "var(--muted)",
             borderRadius: 6,
+            flex: "0 0 auto",
           }}
           onMouseEnter={(e) => (e.currentTarget.style.color = "var(--fg)")}
           onMouseLeave={(e) => (e.currentTarget.style.color = "var(--muted)")}

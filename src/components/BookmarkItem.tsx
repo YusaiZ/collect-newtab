@@ -38,6 +38,9 @@ export function BookmarkItem({ bookmark }: Props) {
         alignItems: "center",
         gap: "10px",
         height: "36px",
+        // Prevent flex column parent from squashing this row when the list
+        // overflows — keep each row a fixed 36px so the nav scrolls instead.
+        flex: "0 0 36px",
         padding: "0 8px",
         borderRadius: "6px",
         textDecoration: "none",

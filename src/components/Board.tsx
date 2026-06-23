@@ -21,7 +21,22 @@ export function Board() {
     const onWheel = (e: WheelEvent) => {
       // Let the browser handle genuine horizontal input (shift+wheel, touchpad).
       if (Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return;
-      // Only translate vertical→horizontal when there's horizontal overflow.
+
+      // If the cursor is over a scrollable column, let that column scroll
+      // vertically first; only translate to board-panning when it can't.
+      const target = e.target as Element | null;
+      const scrollable = target?.closest("[data-col-scroll]") as HTMLElement | null;
+      if (scrollable) {
+        const atTop = scrollable.scrollTop <= 0;
+        const atBottom =
+          scrollable.scrollTop + scrollable.clientHeight >= scrollable.scrollHeight - 1;
+        const goingUp = e.deltaY < 0;
+        const goingDown = e.deltaY > 0;
+        const canScrollCol = (goingUp && !atTop) || (goingDown && !atBottom);
+        if (canScrollCol) return; // let the column handle it
+      }
+
+      // No vertical scroll available under the cursor → pan the board horizontally.
       if (el.scrollWidth <= el.clientWidth) return;
       el.scrollLeft += e.deltaY;
       e.preventDefault();
