@@ -1,51 +1,41 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { ChevronUp, ChevronDown } from "lucide-react";
 import { useBookmarksStore } from "../store/useBookmarksStore";
 import { Column } from "./Column";
 
+/** Number of columns shown per page — overflow paginates vertically. */
+const COLUMNS_PER_PAGE = 4;
+
 /**
- * The horizontally-scrolling board (PRD §4 / §5 横向布局 / §5 超出宽度时横向滚动).
+ * The bookmark board (PRD §4 / §5).
  *
- * Wheel handling: a plain vertical mouse wheel scrolls the board horizontally
- * (since the content only overflows on x). Shift+wheel is already horizontal in
- * most browsers but we normalise it too; touchpads pan natively.
+ * Columns are laid out in a 4-wide grid; when there are more than four they
+ * paginate page-by-page rather than scrolling horizontally. The pager
+ * (▲ / ▼) sits in the top-right corner and only appears when needed.
  */
 export function Board() {
-  const ref = useRef<HTMLDivElement>(null);
   const columns = useBookmarksStore((s) => s.visibleColumns);
   const status = useBookmarksStore((s) => s.status);
 
+  const pageCount = Math.ceil(columns.length / COLUMNS_PER_PAGE) || 1;
+  const [page, setPage] = useState(0);
+
+  // Keep the active page in range as columns change (search/filter, edits…).
   useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
+    if (page > pageCount - 1) setPage(Math.max(0, pageCount - 1));
+  }, [page, pageCount]);
 
-    const onWheel = (e: WheelEvent) => {
-      // Let the browser handle genuine horizontal input (shift+wheel, touchpad).
-      if (Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return;
+  const visible = useMemo(
+    () =>
+      columns.slice(
+        page * COLUMNS_PER_PAGE,
+        page * COLUMNS_PER_PAGE + COLUMNS_PER_PAGE,
+      ),
+    [columns, page],
+  );
 
-      // If the cursor is over a scrollable column, let that column scroll
-      // vertically first; only translate to board-panning when it can't.
-      const target = e.target as Element | null;
-      const scrollable = target?.closest("[data-col-scroll]") as HTMLElement | null;
-      if (scrollable) {
-        const atTop = scrollable.scrollTop <= 0;
-        const atBottom =
-          scrollable.scrollTop + scrollable.clientHeight >= scrollable.scrollHeight - 1;
-        const goingUp = e.deltaY < 0;
-        const goingDown = e.deltaY > 0;
-        const canScrollCol = (goingUp && !atTop) || (goingDown && !atBottom);
-        if (canScrollCol) return; // let the column handle it
-      }
-
-      // No vertical scroll available under the cursor → pan the board horizontally.
-      if (el.scrollWidth <= el.clientWidth) return;
-      el.scrollLeft += e.deltaY;
-      e.preventDefault();
-    };
-
-    // `passive: false` so we can preventDefault the vertical scroll.
-    el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
-  }, []);
+  const canPrev = page > 0;
+  const canNext = page < pageCount - 1;
 
   if (status === "ready" && columns.length === 0) {
     return (
@@ -64,21 +54,113 @@ export function Board() {
   }
 
   return (
-    <div
-      ref={ref}
-      className="board-scroll"
+    <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column" }}>
+      {/* Pager, top-right corner. Only rendered when there is more than one page. */}
+      {pageCount > 1 && (
+        <div
+          style={{
+            position: "absolute",
+            top: 12,
+            right: 16,
+            zIndex: 2,
+            display: "flex",
+            flexDirection: "column",
+            gap: 4,
+            background: "var(--bg)",
+            borderRadius: 10,
+            padding: 4,
+            boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+          }}
+        >
+          <PagerButton
+            active={canPrev}
+            label="上一页"
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+          >
+            <ChevronUp size={18} />
+          </PagerButton>
+          <span
+            style={{
+              fontSize: 11,
+              color: "var(--muted)",
+              textAlign: "center",
+              lineHeight: 1,
+              padding: "2px 0",
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {page + 1}/{pageCount}
+          </span>
+          <PagerButton
+            active={canNext}
+            label="下一页"
+            onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+          >
+            <ChevronDown size={18} />
+          </PagerButton>
+        </div>
+      )}
+
+      {/* 4-column grid page. Fills the available width so columns share space
+          evenly instead of overflowing horizontally. */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          display: "grid",
+          gridTemplateColumns: `repeat(${Math.min(visible.length, COLUMNS_PER_PAGE)}, minmax(0, 1fr))`,
+        }}
+      >
+        {visible.map((col, i) => (
+          <Column
+            key={col.id}
+            column={col}
+            showDivider={i < visible.length - 1}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** A circular pager button that dims to "disabled" when `active` is false. */
+function PagerButton({
+  active,
+  label,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  label: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      aria-label={label}
+      disabled={!active}
+      onClick={onClick}
       style={{
-        position: "absolute",
-        inset: 0,
-        display: "flex",
-        flexDirection: "row",
-        overflowX: "auto",
-        overflowY: "hidden",
+        width: 28,
+        height: 28,
+        display: "grid",
+        placeItems: "center",
+        border: "none",
+        borderRadius: 8,
+        background: "transparent",
+        color: active ? "var(--fg)" : "var(--muted)",
+        opacity: active ? 1 : 0.35,
+        cursor: active ? "pointer" : "default",
+        transition: "background 0.12s ease",
+      }}
+      onMouseEnter={(e) => {
+        if (active) e.currentTarget.style.background = "var(--hover)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = "transparent";
       }}
     >
-      {columns.map((col) => (
-        <Column key={col.id} column={col} />
-      ))}
-    </div>
+      {children}
+    </button>
   );
 }

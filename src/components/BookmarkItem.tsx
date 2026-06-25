@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Bookmark } from "../lib/bookmarks";
-import { faviconUrl, FAVICON_FALLBACK } from "../lib/favicon";
+import { getFavicon, faviconUrl, FAVICON_FALLBACK } from "../lib/favicon";
 
 interface Props {
   bookmark: Bookmark;
@@ -9,13 +9,29 @@ interface Props {
 /**
  * A single bookmark row (PRD §4 / §5 收藏网址项).
  *
- * - 36px tall, 16px lazy-loaded favicon, ellipsised title.
+ * - 36px tall, 16px favicon (locally cached, see lib/favicon), ellipsised title.
  * - Click → open in current tab; Ctrl/Cmd+Click → open in a new tab.
  */
 export function BookmarkItem({ bookmark }: Props) {
-  const [iconError, setIconError] = useState(false);
-  const fav = iconError ? null : faviconUrl(bookmark.url);
+  // Start synchronously from the S2 URL so online icons render exactly as
+  // before; if a cached data URL exists, getFavicon swaps it in (and that data
+  // URL is offline-safe). The placeholder only shows for non-URL bookmarks.
+  const [iconSrc, setIconSrc] = useState<string>(
+    () => faviconUrl(bookmark.url) ?? FAVICON_FALLBACK,
+  );
   const title = bookmark.title || bookmark.url;
+
+  useEffect(() => {
+    let cancelled = false;
+    // Prefer a cached data URL (offline-safe); falls back to the S2 URL
+    // already set above when the cache misses.
+    void getFavicon(bookmark.url).then((src) => {
+      if (!cancelled && src) setIconSrc(src);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [bookmark.url]);
 
   const open = (e: React.MouseEvent) => {
     const newTab = e.metaKey || e.ctrlKey;
@@ -53,12 +69,13 @@ export function BookmarkItem({ bookmark }: Props) {
       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
     >
       <img
-        src={fav ?? FAVICON_FALLBACK}
+        src={iconSrc}
         alt=""
         width={16}
         height={16}
         loading="lazy"
-        onError={() => setIconError(true)}
+        // If even the cached data URL somehow fails, fall back to the glyph.
+        onError={() => setIconSrc(FAVICON_FALLBACK)}
         style={{
           width: 16,
           height: 16,

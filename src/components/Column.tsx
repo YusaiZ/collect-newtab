@@ -4,6 +4,8 @@ import { BookmarkItem } from "./BookmarkItem";
 
 interface Props {
   column: ColumnData;
+  /** Show the right-hand vertical divider. Omit/hide it on the last column. */
+  showDivider?: boolean;
 }
 
 /** How many bookmarks to show before collapsing with a "show more" affordance. */
@@ -12,12 +14,13 @@ const COLLAPSED_LIMIT = 40;
 /**
  * One board column (PRD §3 / §5 收藏夹列).
  *
- * - Fixed 260px width, vertical divider on the right, 18px/600 title.
+ * - Fills its grid cell, vertical divider on the right (unless last), title in
+ *   the system Song typeface at 22px/600.
  * - Bookmarks render lazily; very long folders collapse after
  *   COLLAPSED_LIMIT entries with an expand toggle (a lightweight, pragmatic
  *   alternative to full virtual scrolling — see PRD §7 渲染策略).
  */
-export function Column({ column }: Props) {
+export function Column({ column, showDivider = true }: Props) {
   const [expanded, setExpanded] = useState(false);
   const total = column.bookmarks.length;
   const overLimit = total > COLLAPSED_LIMIT;
@@ -29,17 +32,16 @@ export function Column({ column }: Props) {
   return (
     <section
       style={{
-        width: 260,
-        flex: "0 0 260px",
         height: "100%",
         padding: "24px 16px 16px",
-        borderRight: "1px solid var(--divider)",
+        borderRight: showDivider ? "1px solid var(--divider)" : "none",
         display: "flex",
         flexDirection: "column",
         gap: 8,
         // Keep the column within the board viewport so the bookmark list can
         // scroll on its own instead of overflowing and getting clipped.
         minHeight: 0,
+        minWidth: 0,
       }}
     >
       <header
@@ -53,7 +55,9 @@ export function Column({ column }: Props) {
         <h2
           style={{
             margin: 0,
-            fontSize: 18,
+            // Bumped 18→22px and rendered in the system Song (宋体) typeface.
+            fontFamily: '"Songti SC", "STSong", "SimSun", "Noto Serif CJK SC", serif',
+            fontSize: 22,
             fontWeight: 600,
             color: "var(--fg)",
             whiteSpace: "nowrap",

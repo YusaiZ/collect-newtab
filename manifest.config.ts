@@ -13,5 +13,8 @@ export default defineManifest({
   action: {
     default_title: "Open a new tab to see your bookmarks",
   },
-  permissions: ["bookmarks"],
+  // "storage" lets us cache favicon data URLs locally so icons still render
+  // when Google S2 is unreachable; the host permission covers the S2 fetch.
+  permissions: ["bookmarks", "storage"],
+  host_permissions: ["https://www.google.com/*"],
 });
